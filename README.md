@@ -23,7 +23,7 @@ An e-learning platform is losing users — but doesn't know who, why, or when ex
 ## Project Structure
 
 ```
-📁 project1-who-learns-online/
+📁 who-learns-online/
 │
 ├── 📄 README.md
 │
