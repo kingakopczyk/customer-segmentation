@@ -1,0 +1,16 @@
+course_id,course_name,course_category,course_price,margin_pct,profit_per_sale,cogs_per_sale
+C001,Adobe Illustrator - Master Vector Illustration,Software & Tools,99,0.57,56.43,42.57
+C002,Adobe Photoshop - Make Images Striking,Software & Tools,89,0.55,48.95,40.05
+C003,Adobe InDesign - Layouts & Editorial Design,Software & Tools,79,0.52,41.08,37.92
+C004,Web Design in Figma - Craft User Experience,Software & Tools,99,0.57,56.43,42.57
+C005,Canva - Explore Interactive Presentation,Software & Tools,49,0.45,22.05,26.95
+C006,Animation from Scratch - Put Illustration in Motion,Design Theory,49,0.5,24.5,24.5
+C007,Color Theory - Guide for Graphic Design,Design Theory,19,0.42,7.98,11.02
+C008,Moodboard Creation - Boost your Creativity,Design Theory,29,0.45,13.05,15.95
+C009,Book Cover Design - Visualise Content Effectively,Design Theory,39,0.47,18.33,20.67
+C010,Typography Design - Visual Dimension of Language ,Design Theory,49,0.5,24.5,24.5
+C011,Logo Design - Create Iconic Symbols,Brand & Communication,79,0.55,43.45,35.55
+C012,Presentation Design - Attract & Impact,Brand & Communication,49,0.48,23.52,25.48
+C013,Infographic Design - Make Data Visual,Brand & Communication,69,0.53,36.57,32.43
+C014,Visual Communication - Storytelling Techniques,Brand & Communication,79,0.55,43.45,35.55
+C015,Visual Branding - From Concept to Strategy,Brand & Communication,89,0.58,51.62,37.38
