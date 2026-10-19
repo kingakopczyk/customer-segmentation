@@ -3,7 +3,7 @@
 
 **Project 1 of 3 — Data Analytics Portfolio**
 
-An e-learning platform is losing users — but doesn't know who, why, or when exactly. This project segments 1,000 customers of a fictional design-focused platform called **fave.** using RFM analysis enriched with behavioral data: course completion rates, session engagement, and satisfaction scores. The result is six actionable customer personas and a Power BI dashboard that translates raw behavioral data into retention strategy.
+An e-learning platform is losing users — but doesn't know who, why, or when exactly. This project segments 1,000 customers of a fictional design-focused platform called **fave.** using RFM analysis enriched with behavioral data: course completion rates, session engagement, and satisfaction scores. The result is six actionable customer personas and a Power BI dashboard that translates raw behavioral data into retention strategy. Two interactive Excel dashboards then extend the analysis from the customer side to the course side.
 
 ![Project Flowchart](diagrams/who_learns_online_flowchart.jpg)
 
@@ -16,6 +16,7 @@ An e-learning platform is losing users — but doesn't know who, why, or when ex
 | Synthetic data generation | Python · Faker |
 | Database & analysis | PostgreSQL · SQL |
 | Visualization | Power BI · DAX |
+| Course-side reporting | Excel (Power Pivot · PivotTables · dynamic-array formulas) · VBA |
 | Documentation | Markdown · GitHub |
 
 ---
@@ -51,6 +52,14 @@ An e-learning platform is losing users — but doesn't know who, why, or when ex
 │   ├── Course_Platform-1.jpg
 │   ├── Course_Platform-2.jpg
 │   └── Course_Platform-3.jpg
+│
+├── 📁 excel/
+│   ├── Who_learns_online.xlsx
+│   ├── Who_learns_online.xlsm
+│   ├── 📁 vba/
+│   │   └── refresh_and_export.bas
+│   ├── excel_courses_dashboard.jpg
+│   └── excel_categories_dashboard.jpg
 │
 ├── 📁 diagrams/
 │   ├── who_learns_online_flowchart.jpg
@@ -294,6 +303,48 @@ COUNTROWS(FILTER(
 
 ---
 
+## Excel Dashboards
+
+The Power BI report looks at the platform from the **customer** side. The Excel workbook looks at it from the **course** side: a lightweight, portable report for someone without access to Power BI — for example, a course owner checking how a single course or category performs. It deliberately does not repeat the Power BI pages.
+
+The workbook loads `courses`, `purchases`, `assessments`, `logins` and the SQL output `segmentation` into the Excel Data Model (Power Pivot), related through `course_id` and `customer_id`.
+
+### Dashboard 1 — Course Dashboard (slicer-driven)
+
+One slicer on course name drives every card and chart:
+- unit price and unit profit vs. the platform average
+- total profit, purchase count and the course's share of total company profit (donut chart)
+- average completion rate, star rating with rank among the 15 courses, and average log session duration
+- monthly revenue and profit trend, and revenue by customer segment (segments from the SQL analysis)
+
+KPI cards are text boxes linked to cells; the charts are PivotCharts connected to the same slicer.
+
+![Excel Course Dashboard](excel/excel_courses_dashboard.jpg)
+
+### Dashboard 2 — Category Lookup (dropdown-driven)
+
+A dropdown (data validation) selects one of the three course categories. The sheet runs on dynamic-array formulas (`FILTER`, `SORT`, `UNIQUE`, `XLOOKUP`, `XMATCH`, `AVERAGEIF`, `SUMIF`, `RANK.EQ`):
+- the category's rating, profit and popularity rank (out of 3)
+- average star rating and average course price vs. the platform average
+- the category's share of total profit, and completion rate vs. the general average
+- ranking of the category's courses by purchase count
+
+![Excel Category Lookup](excel/excel_categories_dashboard.jpg)
+
+The two dashboards intentionally use two different filtering mechanisms — a slicer connected to PivotTables, and a dropdown feeding formulas — each suited to its own task.
+
+### Technical Notes
+
+- **Profit is aggregated at transaction level.** Profit per sale (course price − cogs per sale) is attached to every row of `purchases` with `XLOOKUP`, so total profit scales with the number of sales. Summing profit per sale directly on the `courses` table would return the per-unit value, not total profit. `course_category` is added to `purchases` and `assessments` in the same way, to allow filtering by category.
+- **Share of profit uses the company-wide total** as the denominator, independent of the slicer selection — otherwise a single selected course would always show 100%.
+- **Requirements:** desktop Excel (Microsoft 365 or 2021 and newer) for the dynamic arrays and the Data Model.
+
+### VBA Automation
+
+A short macro (`excel/vba/refresh_and_export.bas`), assigned to a button on the dashboard, refreshes the workbook and exports both dashboards to PDF. The macro-enabled copy is `Who_Learns_Online.xlsm`; the `.xlsx` version contains no macros.
+
+---
+
 ## How to Run
 
 ### 1. Generate synthetic data
@@ -314,6 +365,10 @@ Run files in order: `01` → `02` → `03` → `04`.
 
 Open `power_bi/Course_Platform.pbix` in Power BI Desktop.
 The file uses a local data connection — you may need to update the data source path to point to your local CSV files.
+
+### 5. Explore the Excel dashboards
+
+Open `excel/Who_Learns_Online.xlsx` in desktop Excel (Microsoft 365 or 2021 and newer). Pick a course in the slicer on the course dashboard sheet and a category from the dropdown on the category lookup sheet. To use the export button, open the `.xlsm` copy and enable macros.
 
 ---
 
