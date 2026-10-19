@@ -155,7 +155,7 @@ Manual thresholds were chosen for Recency over NTILE to reflect meaningful busin
 
 ### 03 — Behavioral Enrichment & Segmentation
 
-Standard RFM does not capture post-purchase behavior. The RFM table is enriched with four additional dimensions before segment assignment:
+Standard RFM does not capture post-purchase behavior. The RFM table is enriched with five additional dimensions before segment assignment:
 
 - **avg_completion_rate** — average course completion per customer
 - **avg_rating** — average satisfaction score per customer
@@ -208,7 +208,7 @@ Verifies the final segment counts and proportions.
 Champion and Loyal together account for 40.2% of users and drive the majority of profit. Hibernating at 28.1% is the single largest segment and represents the platform's primary retention challenge.
 
 **2. Revenue looks healthy on the surface, but trends are concerning.**
-Monthly profit ($18K) is 23.6% below target, and monthly user retention dropped from 35% to 22% — a 13.4 percentage point decline month-over-month.
+Monthly profit ($18K) is 23.6% below target (target established as 110% of the previous month's profit), and monthly user retention dropped from 35% to 22% — a 13 percentage point decline month-over-month.
 
 **3. Course ratings remain high across all segments — the product is not the problem.**
 Average satisfaction ranges from 3.6 (Collector) to 4.5 (Champion). High ratings alongside declining retention suggest the issue is engagement and habit formation, not content quality.
@@ -378,7 +378,7 @@ This project is part of a three-project data analytics portfolio built to demons
 
 The other two projects in the portfolio:
 - *From Distance to Trust* — NLP & Sentiment Analysis of chatbot user interactions (Python)
-- *Location Intelligence* — Spatial Scoring Model for Real Estate Investment Decisions (Python · GIS · ARIMA)
+- *Location Intelligence* — Spatial Scoring Model for Real Estate Investment Decisions (Python · GIS · ARIMA) — |IN PROGRESS|
 
 ---
 
