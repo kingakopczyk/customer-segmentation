@@ -377,7 +377,7 @@ Open `excel/Who_Learns_Online.xlsx` in desktop Excel (Microsoft 365 or 2021 and 
 This project is part of a three-project data analytics portfolio built to demonstrate end-to-end analytical thinking — from data design and SQL analysis to business storytelling and visualization.
 
 The other two projects in the portfolio:
-- *From Irritation to Trust* — NLP & Sentiment Analysis of chatbot user interactions (Python)
+- *From Distance to Trust* — NLP & Sentiment Analysis of chatbot user interactions (Python)
 - *Location Intelligence* — Spatial Scoring Model for Real Estate Investment Decisions (Python · GIS · ARIMA)
 
 ---
