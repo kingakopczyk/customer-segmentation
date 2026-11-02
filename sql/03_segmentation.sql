@@ -170,7 +170,7 @@ SELECT
         -- long absence, declining session duration, or dropping ratings
         WHEN f.f_score >= 3
              AND (
-                 r.r_score <= 2
+                 r.r_score <= 3
                  OR (
                      st.late_avg_duration IS NOT NULL
                      AND st.late_avg_duration < st.early_avg_duration * 0.75
@@ -186,12 +186,15 @@ SELECT
              AND f.f_score >= 3
              AND b.avg_completion_rate >= 0.55                THEN 'Loyal'
 
-        -- New: joined recently, only one or two purchases
+        -- New: made their first purchase recently, only one or two purchases in total
         WHEN r.r_score = 5
              AND f.f_score <= 2                               THEN 'New'
 
-        -- Hibernating: all remaining customers
-        ELSE 'Hibernating'
+        -- Hibernating: customers with the longest absence 
+        WHEN r.r_score <= 2                                   THEN 'Hibernating'
+
+        -- Other: all remaining customers
+        ELSE 'Other'
     END                                                       AS segment
 
 FROM recency              r
