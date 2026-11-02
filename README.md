@@ -3,7 +3,7 @@
 
 **Project 1 of 3 — Data Analytics Portfolio**
 
-An e-learning platform is losing users — but doesn't know who, why, or when exactly. This project segments 1,000 customers of a fictional design-focused platform called **fave.** using RFM analysis enriched with behavioral data: course completion rates, session engagement, and satisfaction scores. The result is six actionable customer personas and a Power BI dashboard that translates raw behavioral data into retention strategy. Two interactive Excel dashboards then extend the analysis from the customer side to the course side.
+An e-learning platform is losing users — but doesn't know who, why, or when exactly. This project segments customers of a fictional design-focused platform called **fave.** using RFM analysis enriched with behavioral data: course completion rates, session engagement, and satisfaction scores. The result is six actionable customer personas and a Power BI dashboard that translates raw behavioral data into retention strategy. Two interactive Excel dashboards then extend the analysis from the customer side to the course side.
 
 ![Project Flowchart](diagrams/who_learns_online_flowchart.jpg)
 
@@ -81,7 +81,7 @@ A design e-learning platform is experiencing declining monthly revenue and reten
 1. Explore current sales trends and platform-level KPIs
 2. Verify changes in user behavior through login and session data
 3. Segment users based on purchase history, course completion, session activity, and ratings
-4. Diagnose the retention problem through segment size and behavioral signals
+4. Diagnose the retention issue through segment size and behavioral signals
 5. Propose data-driven product decisions for each customer segment
 
 ![Analytical Process](diagrams/analytical_process.jpg)
@@ -116,7 +116,7 @@ logins        login_id · customer_id · course_id · login_date · login_durati
 
 Each synthetic customer was assigned one of six behavioral profiles during generation. These profiles drove realistic variation in purchase frequency, completion rates, session duration, and ratings — and correspond to the segments recovered in the RFM analysis.
 
-> **Note:** The `profile` column used during generation is not included in the final CSV files. It served only as an internal data quality check.
+> **Note:** The `profile` column used during generation is not included in the final CSV files. It was not exported together with other generated data.
 
 ### Key Data Facts
 
@@ -132,7 +132,7 @@ Each synthetic customer was assigned one of six behavioral profiles during gener
 
 ## SQL Analysis
 
-All analysis was performed in **PostgreSQL**. Queries are organized into four files reflecting the analytical workflow.
+All analysis was performed in **PostgreSQL**. Queries are organized into five files reflecting the analytical workflow.
 
 ### 01 — Data Validation
 
@@ -208,7 +208,7 @@ Verifies the final segment counts and proportions.
 Champion and Loyal together account for 40.2% of users and drive the majority of profit. Hibernating at 28.1% is the single largest segment and represents the platform's primary retention challenge.
 
 **2. Revenue looks healthy on the surface, but trends are concerning.**
-Monthly profit ($18K) is 23.6% below target (target established as 110% of the previous month's profit), and monthly user retention dropped from 35% to 22% — a 13 percentage point decline month-over-month.
+Monthly profit ($18K) is 23.6% below target (target established as 110% of the previous month's profit), and monthly user retention slightly dropped from 75% to 74% — a 1 percentage point decline month-over-month.
 
 **3. Course ratings remain high across all segments — the product is not the problem.**
 Average satisfaction ranges from 3.6 (Collector) to 4.5 (Champion). High ratings alongside declining retention suggest the issue is engagement and habit formation, not content quality.
@@ -270,7 +270,23 @@ Repeat Purchase Rate %        = DIVIDE([Returning Customers], DISTINCTCOUNT(purc
 Profit Target                 = [Previous Month Profit] * 1.1
 Purchases Target              = [Previous Month Purchases] * 1.1
 Revenue Target                = [Previous Month Revenue] * 1.1
-New Customers                 = DISTINCTCOUNT(purchases[customer_id]) - [Returning Customers]
+
+New Customers = 
+VAR VisibleDates = VALUES('calendar'[date])
+RETURN
+    COUNTROWS(
+        FILTER(
+            VALUES(customers[customer_id]),
+            VAR FirstPurchase =
+                CALCULATE(
+                    MIN(purchases[purchase_date]),
+                    ALL('calendar')
+                )
+            RETURN
+                NOT ISBLANK(FirstPurchase)
+                    && FirstPurchase IN VisibleDates
+        )
+    )
 
 Avg Monthly Repeat Purchase Rate % = 
 AVERAGEX(
@@ -293,11 +309,24 @@ CALCULATE(
     REMOVEFILTERS(segmentation[segment])
 )
 
-Returning Customers =
-COUNTROWS(FILTER(
-    SUMMARIZE(purchases, purchases[customer_id],
-              "total_purchases", COUNT(purchases[purchase_id])),
-    [total_purchases] > 1))
+Returning Customers = 
+VAR VisibleDates = VALUES('calendar'[date])
+RETURN
+    COUNTROWS(
+        FILTER(
+            VALUES(customers[customer_id]),
+            VAR FirstPurchase =
+                CALCULATE (
+                    MIN(purchases[purchase_date]),
+                    ALL('calendar')
+                )
+            VAR PurchasesInPeriod =
+                CALCULATE (COUNTROWS(purchases))
+            RETURN
+                PurchasesInPeriod > 0
+                    && NOT(FirstPurchase IN VisibleDates)
+        )
+    )
 
 ```
 
@@ -359,7 +388,7 @@ In pgAdmin (or any PostgreSQL client), create a new database and import the five
 ### 3. Run SQL analysis
 
 Open the `sql/` folder in VS Code with the SQLTools extension connected to your PostgreSQL database.
-Run files in order: `01` → `02` → `03` → `04`.
+Run files in order: `01` → `02` → `03` → `04` → `05`.
 
 ### 4. Explore the dashboard
 
