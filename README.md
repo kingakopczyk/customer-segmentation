@@ -114,9 +114,9 @@ logins        login_id · customer_id · course_id · login_date · login_durati
 
 ### Behavioral Profiles
 
-Each synthetic customer was assigned one of six behavioral profiles during generation. These profiles drove realistic variation in purchase frequency, completion rates, session duration, and ratings — and correspond to the segments recovered in the RFM analysis.
+Each synthetic customer was given characteristics of behavioral profiles during generation. These profiles drove realistic variation in purchase frequency, completion rates, session duration, and ratings to strenghten diversity of the segments recovered in the RFM analysis.
 
-> **Note:** The `profile` column used during generation is not included in the final CSV files. It was not exported together with other generated data.
+> **Note:** The profile information used during generation is not included in the final CSV files. It was not exported as a part of generated data.
 
 ### Key Data Facts
 
@@ -177,26 +177,29 @@ Verifies the final segment counts and proportions.
 
 | Segment | Customers | Share |
 |---|---|---|
-| Hibernating | 281 | 28.1% |
-| Loyal | 227 | 22.7% |
+| Hibernating | 173 | 17.3% |
+| Loyal | 146 | 14.6% |
 | Champion | 175 | 17.5% |
 | Collector | 125 | 12.5% |
 | New | 119 | 11.9% |
-| At Risk | 73 | 7.3% |
+| At Risk | 154 | 15.4% |
+| Other | 108 | 10.8% |
 
 ### Segment Definitions
 
 **Champion** — Recent, frequent buyer who completes most courses (avg. 85% completion) and spends significantly more time per session than the platform average. Highest satisfaction score: 4.5/5.
 
-**Loyal** — Regular, methodical learner returning every ~73 days on average. Solid completion rate of 74% and stable satisfaction of 4.0/5. Platform's most dependable revenue source.
+**Loyal** — Regular, methodical learner with short absence of 45 days on average. Solid completion rate of 76% and stable satisfaction of 4.1/5. One of the platform's most dependable revenue source.
 
 **Collector** — Frequent buyer with completion below 55%. Purchases impulsively but rarely engages deeply with content. Satisfaction score of 3.6/5 — the lowest among active buyers.
 
-**At Risk** — Previously engaged user showing at least one of three warning signals: absence of recent purchases, declining session duration (late sessions >25% shorter than early sessions), or dropping ratings (late avg >0.5 below early avg). Average 148 days since last purchase despite historically high activity.
+**At Risk** — Previously engaged user showing at least one of three warning signals: absence of recent purchases, declining session duration (late sessions >25% shorter than early sessions), or dropping ratings (late avg >0.5 below early avg). Average 135 days since last purchase despite historically high activity.
 
-**New** — Recently joined, still exploring. One or two purchases, 66% completion rate, and an above-average satisfaction score of 4.1/5 — a positive first impression that needs to be reinforced.
+**New** — Recently made the first purchase, still exploring. With one or two purchases in total, 66% completion rate, and an above-average satisfaction score of 4.1/5 — a positive first impression that needs to be reinforced.
 
-**Hibernating** — Long inactive, with an average of 287 days since last purchase. Despite a 28.1% share — the largest segment — their cumulative profit contribution of $25K represents significant untapped reactivation potential.
+**Hibernating** — Long inactive, with an average of 402 days since last purchase. Having once had high average course completion rate of 66% and cumulative profit contribution of $13K, represents significant untapped reactivation potential.
+
+**Other** — Indicates users, who were not classified to any defined segment. Such customers may have not given enough course assessments or did not present behaviors with a clear pattern.
 
 ![Persona Illustration](graphics/persona_illustration.jpg)
 
@@ -204,20 +207,20 @@ Verifies the final segment counts and proportions.
 
 ## Key Insights
 
-**1. The platform has a strong engaged core — but nearly 1 in 3 customers has gone silent.**
-Champion and Loyal together account for 40.2% of users and drive the majority of profit. Hibernating at 28.1% is the single largest segment and represents the platform's primary retention challenge.
+**1. The platform has a strong engaged core — but nearly 1 in 3 customers has gone silent or remains at risk.**
+Champion drive the majority of profit, being also the single largest segment of 17.5% of users. Together with Loyal they account they just slightly outnumber the pair of Hibernating and At Risk. Hibernating at 17.3%, being only 0.2% after Champion, represents the platform's primary retention challenge.
 
 **2. Revenue looks healthy on the surface, but trends are concerning.**
-Monthly profit ($18K) is 23.6% below target (target established as 110% of the previous month's profit), and monthly user retention slightly dropped from 75% to 74% — a 1 percentage point decline month-over-month.
+Monthly profit ($18K) is 23.6% below target (target established as 110% of the previous month's profit replaces a real company goal set individually), and monthly user retention slightly dropped from 75% to 74% — a 1 percentage point decline month-over-month.
 
-**3. Course ratings remain high across all segments — the product is not the problem.**
-Average satisfaction ranges from 3.6 (Collector) to 4.5 (Champion). High ratings alongside declining retention suggest the issue is engagement and habit formation, not content quality.
+**3. Course ratings remain high across all segments — the declaired satisfaction is constant.**
+Average satisfaction ranges from 3.6 (Collector) to 4.5 (Champion). High ratings alongside declining revenue and retention suggest the issue may be engagement and habit formation, not content quality. However, only a part of customers decides to assess courses distorting the average rating outcome.
 
 **4. Collectors represent a conversion opportunity, not a lost cause.**
 With frequent purchases but low completion, this segment is buying aspirationally. Shorter content formats and progress nudges could convert browsers into learners.
 
 **5. At Risk users were once highly engaged.**
-Their historical completion rate of 72% is higher than New (66%) and Hibernating (68%) — meaning they know how to use the platform. Re-engagement here is more efficient than acquisition.
+Their average completion rate of 72% is as higher both than New (66%) and Hibernating (66%) — meaning they know how to use the platform. Re-engagement here is more efficient than acquisition.
 
 ---
 
@@ -265,8 +268,8 @@ Avg Miscompletion Rate        = 1 - AVERAGE(segmentation[avg_completion_rate])
 Avg Recency                   = AVERAGE(segmentation[days_since_last_purchase])
 Avg Segment Rating            = AVERAGE(segmentation[avg_rating])
 Avg Segment Rating Gap        = 5 - AVERAGE(segmentation[avg_rating])
-Avg Session Duration          = AVERAGE(segmentation[late_avg_duration])
-Repeat Purchase Rate %        = DIVIDE([Returning Customers], DISTINCTCOUNT(purchases[customer_id]))
+Avg Session Duration          = DIVIDE(SUM(logins[login_duration]), DISTINCTCOUNT(logins[login_id]))
+Repeat Purchase Rate %        = DIVIDE([Returning Customers], ([Returning Customers] + [New Customers])))
 Profit Target                 = [Previous Month Profit] * 1.1
 Purchases Target              = [Previous Month Purchases] * 1.1
 Revenue Target                = [Previous Month Revenue] * 1.1
