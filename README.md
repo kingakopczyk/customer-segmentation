@@ -194,7 +194,7 @@ Verifies the final segment counts and proportions.
 
 **At Risk** — Previously engaged user showing at least one of three warning signals: absence of recent purchases, declining session duration (late sessions >25% shorter than early sessions), or dropping ratings (late avg >0.5 below early avg). Average 148 days since last purchase despite historically high activity.
 
-**New** — Recently joined, still exploring. One or two purchases, 66% completion rate, and an above-average satisfaction score of 4.1/5 — a positive first impression that needs to be reinforced.
+**New** — Recently made the first purchase, still exploring. One or two purchases, 66% completion rate, and an above-average satisfaction score of 4.1/5 — a positive first impression that needs to be reinforced.
 
 **Hibernating** — Long inactive, with an average of 287 days since last purchase. Despite a 28.1% share — the largest segment — their cumulative profit contribution of $25K represents significant untapped reactivation potential.
 
@@ -265,8 +265,8 @@ Avg Miscompletion Rate        = 1 - AVERAGE(segmentation[avg_completion_rate])
 Avg Recency                   = AVERAGE(segmentation[days_since_last_purchase])
 Avg Segment Rating            = AVERAGE(segmentation[avg_rating])
 Avg Segment Rating Gap        = 5 - AVERAGE(segmentation[avg_rating])
-Avg Session Duration          = AVERAGE(segmentation[late_avg_duration])
-Repeat Purchase Rate %        = DIVIDE([Returning Customers], DISTINCTCOUNT(purchases[customer_id]))
+Avg Session Duration          = DIVIDE(SUM(logins[login_duration]), DISTINCTCOUNT(logins[login_id]))
+Repeat Purchase Rate %        = DIVIDE([Returning Customers], ([Returning Customers] + [New Customers])))
 Profit Target                 = [Previous Month Profit] * 1.1
 Purchases Target              = [Previous Month Purchases] * 1.1
 Revenue Target                = [Previous Month Revenue] * 1.1
