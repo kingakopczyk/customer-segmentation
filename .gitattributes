@@ -1,0 +1,19 @@
+# Line endings: text files are stored with LF in the repository, whatever
+# operating system they are edited on (Windows editors save CRLF, which
+# otherwise shows up in git as "the whole file changed").
+* text=auto
+
+# VBA modules are imported by the VBA editor, which expects Windows (CRLF)
+# line endings, so keep them in the working tree on every platform.
+*.bas text eol=crlf
+
+# Data files are read byte-for-byte by PostgreSQL, Power Query and Power BI.
+*.csv -text
+
+# Binary files are never converted.
+*.xlsx binary
+*.xlsm binary
+*.pbix binary
+*.pdf  binary
+*.jpg  binary
+*.png  binary

@@ -1,217 +1,170 @@
+-- =====================================================================
+-- 04_SEGMENTS_DISTRIBUTION.SQL  |  Segment sizes, profiles and diagnostics
+-- =====================================================================
+-- RUN     : query by query - select a query and press Ctrl+E, E.
+-- REQUIRES: 03_segmentation.sql (view v_customer_segments).
+-- All queries read the view, so nothing here repeats the segment rules.
+-- =====================================================================
 
--- ── SEGMENT DISTRIBUTION ─────────────────────────────────────
--- Run this to verify segment sizes.
 
-WITH
+-- ── 4.1 SEGMENT DISTRIBUTION ─────────────────────────────────────────
+-- Export -> data/sql_queries_results/segments_distribution.csv
 
--- ── 1. RECENCY ───────────────────────────────────────────────
-recency AS (
-    SELECT
-        customer_id,
-        last_purchase_date,
-        days_since_last_purchase,
-        CASE
-            WHEN days_since_last_purchase <= 30  THEN 5
-            WHEN days_since_last_purchase <= 90  THEN 4
-            WHEN days_since_last_purchase <= 180 THEN 3
-            WHEN days_since_last_purchase <= 365 THEN 2
-            ELSE 1
-        END AS r_score
-    FROM (
-        SELECT
-            customer_id,
-            MAX(purchase_date)                                AS last_purchase_date,
-            ('2024-12-31'::date - MAX(purchase_date))         AS days_since_last_purchase
-        FROM purchases
-        GROUP BY customer_id
-    ) AS recency_base
-),
-
--- ── 2. FREQUENCY ─────────────────────────────────────────────
-frequency AS (
-    SELECT
-        customer_id,
-        COUNT(purchase_id)                                    AS total_purchases,
-        NTILE(5) OVER (ORDER BY COUNT(purchase_id) ASC)       AS f_score
-    FROM purchases
-    GROUP BY customer_id
-),
-
--- ── 3. MONETARY ──────────────────────────────────────────────
-monetary AS (
-    SELECT
-        customer_id,
-        ROUND(SUM(amount_paid)::numeric, 2)                   AS total_spent,
-        NTILE(5) OVER (ORDER BY SUM(amount_paid) ASC)         AS m_score
-    FROM purchases
-    GROUP BY customer_id
-),
-
--- ── 4. COMPLETION RATE AND RATING ────────────────────────────
-behavior AS (
-    SELECT
-        customer_id,
-        ROUND(AVG(completion_rate)::numeric, 2)               AS avg_completion_rate,
-        ROUND(AVG(rating)::numeric, 2)                        AS avg_rating
-    FROM assessments
-    GROUP BY customer_id
-),
-
--- ── 5. SESSION ENGAGEMENT RATIO ──────────────────────────────
--- Compares each customer's session duration to the average for
--- that specific course. Ratio > 1.0 = above-average engagement.
-session_behavior AS (
-    SELECT
-        l.customer_id,
-        COUNT(l.login_id)                                     AS total_sessions,
-        ROUND(
-            AVG(
-                l.login_duration::numeric /
-                NULLIF(course_avg.course_avg_duration, 0)
-            )::numeric, 2
-        )                                                     AS engagement_ratio
-    FROM logins l
-    INNER JOIN (
-        SELECT
-            course_id,
-            AVG(login_duration)                               AS course_avg_duration
-        FROM logins
-        GROUP BY course_id
-    ) AS course_avg USING (course_id)
-    GROUP BY l.customer_id
-),
-
--- ── 6. SESSION DURATION TREND ────────────────────────────────
--- Sessions split into early and late halves per customer.
--- A significant drop in late sessions signals declining engagement.
--- Customers with only one session will have NULL in late_avg_duration.
-session_trend AS (
-    SELECT
-        customer_id,
-        AVG(CASE WHEN session_rank <= total_sessions / 2
-                 THEN login_duration END)                     AS early_avg_duration,
-        AVG(CASE WHEN session_rank > total_sessions / 2
-                 THEN login_duration END)                     AS late_avg_duration
-    FROM (
-        SELECT
-            customer_id,
-            login_duration,
-            ROW_NUMBER() OVER (
-                PARTITION BY customer_id
-                ORDER BY login_date ASC)                      AS session_rank,
-            COUNT(*) OVER (
-                PARTITION BY customer_id)                     AS total_sessions
-        FROM logins
-    ) AS ranked
-    GROUP BY customer_id
-),
-
--- ── 7. RATING TREND ──────────────────────────────────────────
--- Ratings split into early and late halves based on purchase order.
--- A drop in late ratings may indicate growing dissatisfaction.
--- Customers with only one rated course will have NULL in late_avg_rating.
-rating_trend AS (
-    SELECT
-        a.customer_id,
-        AVG(CASE WHEN purchase_rank <= total_purchases / 2
-                 THEN a.rating END)                           AS early_avg_rating,
-        AVG(CASE WHEN purchase_rank > total_purchases / 2
-                 THEN a.rating END)                           AS late_avg_rating
-    FROM assessments a
-    INNER JOIN (
-        SELECT
-            customer_id,
-            course_id,
-            ROW_NUMBER() OVER (
-                PARTITION BY customer_id
-                ORDER BY purchase_date ASC)                   AS purchase_rank,
-            COUNT(*) OVER (
-                PARTITION BY customer_id)                     AS total_purchases
-        FROM purchases
-    ) AS p USING (customer_id, course_id)
-    WHERE a.rating IS NOT NULL
-    GROUP BY a.customer_id
-),
-
--- ── 8.SEGMENT ASSIGNMENT ───────────────────────────────────────
--- Segments are assigned based on RFM scores, completion rates, 
--- session engagement, and trends in session duration and ratings.
-segmented AS (
-    SELECT
-    r.customer_id,
-    r.last_purchase_date,
-    r.days_since_last_purchase,
-    r.r_score,
-    f.total_purchases,
-    f.f_score,
-    m.total_spent,
-    m.m_score,
-    (r.r_score + f.f_score + m.m_score)                       AS rfm_score,
-    b.avg_completion_rate,
-    b.avg_rating,
-    sb.total_sessions,
-    sb.engagement_ratio,
-    st.early_avg_duration,
-    st.late_avg_duration,
-    rt.early_avg_rating,
-    rt.late_avg_rating,
-
-    CASE
-        -- Champion: recent, frequent, completes courses, engaged in sessions
-        WHEN r.r_score >= 4
-             AND f.f_score >= 4
-             AND b.avg_completion_rate >= 0.75
-             AND sb.engagement_ratio >= 1.0                   THEN 'Champion'
-
-        -- Collector: buys frequently but rarely finishes, short sessions
-        WHEN f.f_score >= 3
-             AND b.avg_completion_rate < 0.55                 THEN 'Collector'
-
-        -- At Risk: previously active, showing at least one warning signal:
-        -- long absence, declining session duration, or dropping ratings
-        WHEN f.f_score >= 3
-             AND (
-                 r.r_score <= 3
-                 OR (
-                     st.late_avg_duration IS NOT NULL
-                     AND st.late_avg_duration < st.early_avg_duration * 0.75
-                 )
-                 OR (
-                     rt.late_avg_rating IS NOT NULL
-                     AND rt.late_avg_rating < rt.early_avg_rating - 0.5
-                 )
-             )                                                THEN 'At Risk'
-
-        -- Loyal: regular buyer with solid completion rate
-        WHEN r.r_score >= 3
-             AND f.f_score >= 3
-             AND b.avg_completion_rate >= 0.55                THEN 'Loyal'
-
-        -- New: made their first purchase recently, only one or two purchases in total
-        WHEN r.r_score = 5
-             AND f.f_score <= 2                               THEN 'New'
-
-        -- Hibernating: customers with the longest absence
-        WHEN r.r_score <= 2                                   THEN 'Hibernating'
-
-        -- Other: all remaining customers
-        ELSE 'Other'
-    END                                                       AS segment
-
-FROM recency              r
-INNER JOIN frequency      f  USING (customer_id)
-INNER JOIN monetary       m  USING (customer_id)
-LEFT  JOIN behavior       b  USING (customer_id)
-LEFT  JOIN session_behavior sb USING (customer_id)
-LEFT  JOIN session_trend  st USING (customer_id)
-LEFT  JOIN rating_trend   rt USING (customer_id)
-ORDER BY rfm_score DESC)
-
--- ── 9. FINAL SELECT FOR SEGMENTS DISTRIBUTION CHECK ──────────────────
-
-SELECT segment,
-         COUNT(*) AS segment_count,
-         ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS segment_percentage
-FROM segmented
+SELECT
+    segment,
+    COUNT(*)                                              AS segment_count,
+    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2)    AS segment_percentage
+FROM v_customer_segments
 GROUP BY segment
-ORDER BY segment_count DESC;
+ORDER BY segment_count DESC, segment;
+
+
+-- ── 4.2 SEGMENT PROFILES ─────────────────────────────────────────────
+-- One row per segment: who they are, how they behave, how much profit
+-- they bring. Profit = amount_paid - cogs_per_sale (as in Power BI).
+-- NOTE: completion and engagement are part of the segment DEFINITIONS, so
+-- differences in those columns are by construction. The informative
+-- columns are the ones NOT used by the rules: rating, profit, purchases,
+-- login activity of the non-silent segments.
+-- avg_days_between_purchases = (last - first purchase) / (purchases - 1),
+-- for customers with at least two purchases.
+
+WITH customer_profit AS (
+    SELECT p.customer_id,
+           SUM(p.amount_paid - c.cogs_per_sale)::numeric AS profit
+    FROM purchases p
+    INNER JOIN courses c USING (course_id)
+    GROUP BY p.customer_id
+)
+SELECT
+    s.segment,
+    COUNT(*)                                                         AS customers,
+    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1)               AS customers_pct,
+    ROUND(AVG(s.avg_completion_rate), 2)                             AS avg_completion_rate,
+    ROUND(AVG(s.avg_rating), 2)                                      AS avg_rating,
+    ROUND(AVG(s.total_purchases), 1)                                 AS avg_purchases,
+    ROUND(AVG((s.last_purchase_date - s.first_purchase_date)::numeric
+              / NULLIF(s.total_purchases - 1, 0)))                   AS avg_days_between_purchases,
+    ROUND(AVG(s.days_since_last_purchase))                           AS avg_days_since_last_purchase,
+    ROUND(AVG(s.days_since_first_purchase))                          AS avg_days_since_first_purchase,
+    ROUND(AVG(s.days_since_last_login))                              AS avg_days_since_last_login,
+    ROUND(AVG(s.engagement_ratio), 2)                                AS avg_engagement_ratio,
+    ROUND(AVG(s.sessions_last_90d), 1)                               AS avg_sessions_last_90d,
+    ROUND(AVG(s.sessions_prev_90d), 1)                               AS avg_sessions_prev_90d,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE s.days_since_last_login <= 30) / COUNT(*)) AS pct_logged_in_last_30d,
+    ROUND(SUM(cp.profit))                                            AS total_profit,
+    ROUND(100.0 * SUM(cp.profit) / SUM(SUM(cp.profit)) OVER (), 1)   AS profit_share_pct,
+    ROUND(AVG(cp.profit))                                            AS avg_profit_per_customer
+FROM v_customer_segments s
+INNER JOIN customer_profit cp USING (customer_id)
+GROUP BY s.segment
+ORDER BY customers DESC, s.segment;
+
+
+-- ── 4.3 WHY CUSTOMERS ARE "AT RISK" ──────────────────────────────────
+-- (a) Which rule labelled them (the first matching signal wins).
+
+SELECT
+    segment_reason,
+    COUNT(*)                                              AS customers,
+    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1)    AS pct_of_segment
+FROM v_customer_segments
+WHERE segment = 'At Risk'
+GROUP BY segment_reason
+ORDER BY customers DESC;
+
+-- (b) How many At Risk customers show each signal (signals overlap, so the
+--     columns do not add up to the segment size).
+
+SELECT
+    COUNT(*)                                                                         AS at_risk_customers,
+    COUNT(*) FILTER (WHERE sessions_prev_90d >= 3
+                       AND sessions_last_90d <= 0.5 * sessions_prev_90d)             AS logins_down_50pct,
+    COUNT(*) FILTER (WHERE sessions_prev_90d >= 3
+                       AND minutes_last_90d  <= 0.5 * minutes_prev_90d)              AS login_time_down_50pct,
+    COUNT(*) FILTER (WHERE days_since_last_login > 30)                               AS no_login_30d
+FROM v_customer_segments
+WHERE segment = 'At Risk';
+
+
+-- ── 4.4 WHY CUSTOMERS ARE IN "OTHER" ─────────────────────────────────
+-- (a) The reason is stored per customer.
+
+SELECT
+    segment_reason,
+    COUNT(*)                                              AS customers,
+    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1)    AS pct_of_segment
+FROM v_customer_segments
+WHERE segment = 'Other'
+GROUP BY segment_reason
+ORDER BY customers DESC;
+
+-- (b) Where they sit: age of the last purchase and login status.
+
+SELECT
+    CASE WHEN days_since_last_purchase <= 30  THEN '1: purchase <=30 days ago'
+         WHEN days_since_last_purchase <= 90  THEN '2: purchase 31-90 days ago'
+         WHEN days_since_last_purchase <= 180 THEN '3: purchase 91-180 days ago'
+         ELSE                                      '4: purchase >180 days ago' END   AS last_purchase,
+    COUNT(*)                                                                         AS customers,
+    COUNT(*) FILTER (WHERE days_since_last_login <= 90)                              AS logged_in_last_90d,
+    ROUND(AVG(avg_completion_rate), 2)                                               AS avg_completion_rate
+FROM v_customer_segments
+WHERE segment = 'Other'
+GROUP BY 1
+ORDER BY 1;
+
+
+-- ── 4.5 HOW SENSITIVE IS "AT RISK" TO ITS THRESHOLDS? ────────────────
+-- 03 uses: logins / login time <= 50% of the previous 90 days, or no login
+-- for more than 30 days. This grid counts the customers who would be flagged
+-- under other choices (rows = decline threshold, columns = days of silence).
+-- Population: repeat buyers still in play, i.e. customers currently "At Risk"
+-- or "Loyal". The chosen setting is 0.50 / 30 days. The segment stays small
+-- (4-8% of customers) under every setting tested.
+
+WITH base AS (
+    SELECT
+        t.th,
+        COALESCE(s.days_since_last_login, 9999) AS days_since_last_login,
+        (s.sessions_prev_90d >= 3
+         AND (s.sessions_last_90d <= t.th * s.sessions_prev_90d
+           OR s.minutes_last_90d  <= t.th * s.minutes_prev_90d)) AS fading
+    FROM v_customer_segments s
+    CROSS JOIN (VALUES (0.40), (0.50), (0.60), (0.75)) AS t(th)
+    WHERE s.segment IN ('At Risk', 'Loyal')
+)
+SELECT
+    th                                                          AS decline_threshold,
+    COUNT(*) FILTER (WHERE fading OR days_since_last_login > 21) AS silent_over_21_days,
+    COUNT(*) FILTER (WHERE fading OR days_since_last_login > 30) AS silent_over_30_days,
+    COUNT(*) FILTER (WHERE fading OR days_since_last_login > 45) AS silent_over_45_days,
+    COUNT(*) FILTER (WHERE fading OR days_since_last_login > 60) AS silent_over_60_days
+FROM base
+GROUP BY th
+ORDER BY th;
+
+
+-- ── 4.6 INTEGRITY CHECKS (every row must show violations = 0) ────────
+
+SELECT check_name, violations,
+       CASE WHEN violations = 0 THEN 'OK' ELSE 'CHECK' END AS status
+FROM (
+    SELECT 'customers missing from the segmentation' AS check_name,
+           (SELECT COUNT(*) FROM customers)
+         - (SELECT COUNT(DISTINCT customer_id) FROM v_customer_segments) AS violations
+    UNION ALL
+    SELECT 'duplicated customers in the segmentation',
+           COUNT(*) - COUNT(DISTINCT customer_id) FROM v_customer_segments
+    UNION ALL
+    SELECT 'customers with an empty segment',
+           COUNT(*) FROM v_customer_segments WHERE segment IS NULL OR segment = ''
+    UNION ALL
+    SELECT 'segment name outside the seven expected',
+           COUNT(*) FROM v_customer_segments
+           WHERE segment NOT IN ('Champion','Loyal','Collector','At Risk','New','Hibernating','Other')
+    UNION ALL
+    SELECT 'customers in Other that matched no rule',
+           COUNT(*) FROM v_customer_segments
+           WHERE segment_reason LIKE 'no rule matched%'
+) AS checks;
